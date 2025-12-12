@@ -3,6 +3,7 @@ from discord.ext import commands, tasks
 from datetime import datetime, timedelta
 import json
 import re
+import os
 from collections import defaultdict
 
 # ============ CONFIGURACIÓN ============
