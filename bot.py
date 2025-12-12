@@ -8,8 +8,15 @@ from collections import defaultdict
 
 # ============ CONFIGURACIÓN ============
 # IDs de los canales
-CANAL_SERVICIOAPP = os.getenv('CANAL_SERVICIOAPP_ID')  # Reemplaza con el ID del canal de ServicioAPP
-CANAL_COMANDOS = os.getenv('CANAL_COMANDOS_ID')  # Reemplaza con el ID del canal de comandos
+CANAL_SERVICIOAPP_ID = os.getenv('CANAL_SERVICIOAPP_ID')
+CANAL_COMANDOS_ID = os.getenv('CANAL_COMANDOS_ID')
+
+# Convertir a enteros y validar
+if not CANAL_SERVICIOAPP_ID or not CANAL_COMANDOS_ID:
+    raise ValueError("⚠️ Faltan las variables CANAL_SERVICIOAPP_ID o CANAL_COMANDOS_ID")
+
+CANAL_SERVICIOAPP = int(CANAL_SERVICIOAPP_ID)
+CANAL_COMANDOS = int(CANAL_COMANDOS_ID)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -410,7 +417,7 @@ async def weekly_reset():
     tracker.weekly_stats.clear()
     tracker.save_data()
 
-# Token del bot
+# Token del bot desde variable de entorno
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 if not TOKEN:
