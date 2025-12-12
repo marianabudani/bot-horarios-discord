@@ -223,7 +223,7 @@ async def on_message(message):
         return
     
     # Solo procesar mensajes del bot ServicioAPP en el canal específico
-    if message.author.name == 'ServicioAPP' and message.channel.id == CANAL_SERVICIOAPP:
+    if message.author.name == 'Servicio' and message.channel.id == CANAL_SERVICIOAPP:
         # Obtener el canal de comandos para enviar las notificaciones
         canal_comandos = bot.get_channel(CANAL_COMANDOS)
         
