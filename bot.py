@@ -10,11 +10,23 @@ from collections import defaultdict
 # Token del bot - desde variables de entorno
 TOKEN = os.getenv('DISCORD_TOKEN')
 if not TOKEN:
+    print("🔍 DEBUG: Variables disponibles:")
+    for key, value in sorted(os.environ.items()):
+        print(f"   {key}: {value}")
     raise ValueError("❌ ERROR CRÍTICO: No se encontró DISCORD_TOKEN en las variables de entorno")
 
 # IDs de los canales - desde variables de entorno o valores por defecto
-CANAL_SERVICIOAPP_STR = os.getenv('CANAL_SERVICIOAPP', '1448835558410289183')
-CANAL_COMANDOS_STR = os.getenv('CANAL_COMANDOS', '1448858691670376468')
+CANAL_SERVICIOAPP_STR = os.getenv('CANAL_SERVICIOAPP')
+CANAL_COMANDOS_STR = os.getenv('CANAL_COMANDOS')
+
+print(f"🔍 DEBUG: CANAL_SERVICIOAPP_STR = {CANAL_SERVICIOAPP_STR}")
+print(f"🔍 DEBUG: CANAL_COMANDOS_STR = {CANAL_COMANDOS_STR}")
+
+# Si no están en variables, usar valores por defecto
+if not CANAL_SERVICIOAPP_STR:
+    CANAL_SERVICIOAPP_STR = '1448835558410289183'
+if not CANAL_COMANDOS_STR:
+    CANAL_COMANDOS_STR = '1448858691670376468'
 
 try:
     CANAL_SERVICIOAPP = int(CANAL_SERVICIOAPP_STR)
