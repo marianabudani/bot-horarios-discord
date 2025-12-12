@@ -7,26 +7,14 @@ import os
 from collections import defaultdict
 
 # ============ CONFIGURACIÓN ============
-# Token del bot - desde variables de entorno
+# Token del bot
 TOKEN = os.getenv('DISCORD_TOKEN')
 if not TOKEN:
-    print("🔍 DEBUG: Variables disponibles:")
-    for key, value in sorted(os.environ.items()):
-        print(f"   {key}: {value}")
     raise ValueError("❌ ERROR CRÍTICO: No se encontró DISCORD_TOKEN en las variables de entorno")
 
-# IDs de los canales - desde variables de entorno o valores por defecto
-CANAL_SERVICIOAPP_STR = os.getenv('CANAL_SERVICIOAPP')
-CANAL_COMANDOS_STR = os.getenv('CANAL_COMANDOS')
-
-print(f"🔍 DEBUG: CANAL_SERVICIOAPP_STR = {CANAL_SERVICIOAPP_STR}")
-print(f"🔍 DEBUG: CANAL_COMANDOS_STR = {CANAL_COMANDOS_STR}")
-
-# Si no están en variables, usar valores por defecto
-if not CANAL_SERVICIOAPP_STR:
-    CANAL_SERVICIOAPP_STR = '1448835558410289183'
-if not CANAL_COMANDOS_STR:
-    CANAL_COMANDOS_STR = '1448858691670376468'
+# IDs de los canales - con valores por defecto
+CANAL_SERVICIOAPP_STR = os.getenv('CANAL_SERVICIOAPP_ID', '1448835558410289183')
+CANAL_COMANDOS_STR = os.getenv('CANAL_COMANDOS_ID', '1448858691670376468')
 
 try:
     CANAL_SERVICIOAPP = int(CANAL_SERVICIOAPP_STR)
@@ -42,19 +30,6 @@ intents.message_content = True
 intents.messages = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
-
-# ============ DEPURACIÓN ============
-print("🔍 DEPURANDO VARIABLES DE ENTORNO:")
-print(f"   - DISCORD_TOKEN: {'✅ SET' if os.getenv('DISCORD_TOKEN') else '❌ NO SET'}")
-print(f"   - CANAL_SERVICIOAPP: {os.getenv('CANAL_SERVICIOAPP', '❌ NO SET')}")
-print(f"   - CANAL_COMANDOS: {os.getenv('CANAL_COMANDOS', '❌ NO SET')}")
-print(f"   - RAILPACK_PYTHON_VERSION: {os.getenv('RAILPACK_PYTHON_VERSION', '❌ NO SET')}")
-
-# Listar todas las variables disponibles
-print("\n📋 TODAS LAS VARIABLES DISPONIBLES:")
-for key, value in os.environ.items():
-    if 'TOKEN' in key or 'CANAL' in key or 'RAIL' in key:
-        print(f"   - {key}: {'***' if 'TOKEN' in key else value}")
 
 # Almacenamiento de datos
 class ShiftTracker:
@@ -191,9 +166,9 @@ async def on_ready():
     canal_comandos = bot.get_channel(CANAL_COMANDOS)
     
     if canal_servicio:
-        print(f'✅ Canal ServicioAPP encontrado: {canal_servicio.name} (ID: {canal_servicio.id})')
+        print(f'✅ Canal Servicio encontrado: {canal_servicio.name} (ID: {canal_servicio.id})')
     else:
-        print(f'⚠️ No se pudo encontrar el canal ServicioAPP (ID: {CANAL_SERVICIOAPP})')
+        print(f'⚠️ No se pudo encontrar el canal Servicio (ID: {CANAL_SERVICIOAPP})')
         print(f'   Verifica que el bot tenga acceso al canal y que el ID sea correcto')
     
     if canal_comandos:
@@ -210,7 +185,7 @@ async def on_ready():
                 description="El bot está listo para registrar entradas y salidas.",
                 color=discord.Color.green()
             )
-            embed.add_field(name="Comandos Disponibles", value="`!hoy` `!semana` `!activos`", inline=False)
+            embed.add_field(name="Comandos Disponibles", value="`!hoy` `!semana` `!activos` `!escanear`", inline=False)
             await canal_comandos.send(embed=embed)
             print(f'✅ Mensaje de inicio enviado al canal de comandos')
         except Exception as e:
@@ -222,14 +197,24 @@ async def on_message(message):
     if message.author == bot.user:
         return
     
+    # DEBUG: Log de todos los mensajes que ve el bot
+    print(f"📨 Mensaje detectado:")
+    print(f"   - Autor: {message.author.name} (ID: {message.author.id})")
+    print(f"   - Canal: {message.channel.name} (ID: {message.channel.id})")
+    print(f"   - Contenido: {message.content[:100]}")
+    
     # Solo procesar mensajes del bot ServicioAPP en el canal específico
     if message.author.name == 'Servicio' and message.channel.id == CANAL_SERVICIOAPP:
+        print(f"✅ Mensaje de Servicio detectado en el canal correcto")
         # Obtener el canal de comandos para enviar las notificaciones
         canal_comandos = bot.get_channel(CANAL_COMANDOS)
         
         if not canal_comandos:
             print(f"⚠️ No se pudo encontrar el canal de comandos")
             return
+        
+        print(f"🔍 Procesando mensaje de ServicioAPP:")
+        print(f"   Contenido completo: '{message.content}'")
         
         # Patrón para extraer DNI y nombre
         patron_entrada = r'\[PDA(\d+)\]\s+([^h]+)\s+ha entrado en servicio'
@@ -238,9 +223,15 @@ async def on_message(message):
         match_entrada = re.search(patron_entrada, message.content)
         match_salida = re.search(patron_salida, message.content)
         
+        if not match_entrada and not match_salida:
+            print(f"❌ No se encontró patrón de entrada/salida en el mensaje")
+            print(f"   ¿Es un mensaje de entrada/salida de servicio?")
+            return
+        
         if match_entrada:
             dni = match_entrada.group(1)
             nombre = match_entrada.group(2).strip()
+            print(f"✅ ENTRADA detectada: DNI={dni}, Nombre={nombre}")
             entrada = tracker.registrar_entrada(dni, nombre)
             
             embed = discord.Embed(
@@ -257,6 +248,7 @@ async def on_message(message):
         elif match_salida:
             dni = match_salida.group(1)
             nombre = match_salida.group(2).strip()
+            print(f"✅ SALIDA detectada: DNI={dni}, Nombre={nombre}")
             turno = tracker.registrar_salida(dni, nombre)
             
             if turno:
@@ -443,6 +435,119 @@ async def empleados_activos(ctx):
         )
     
     await ctx.send(embed=embed)
+
+@bot.command(name='escanear')
+@commands.has_permissions(administrator=True)
+async def escanear_historial(ctx, cantidad: int = 100):
+    """Escanea mensajes históricos para registrar entradas/salidas (solo admins)"""
+    
+    if cantidad > 1000:
+        await ctx.send("⚠️ Por seguridad, máximo 1000 mensajes. Usa: `!escanear 1000`")
+        return
+    
+    await ctx.send(f"🔍 Escaneando los últimos {cantidad} mensajes del canal de Servicio...")
+    
+    # Obtener el canal de ServicioAPP
+    canal_servicio = bot.get_channel(CANAL_SERVICIOAPP)
+    
+    if not canal_servicio:
+        await ctx.send(f"❌ No se pudo acceder al canal de Servicio (ID: {CANAL_SERVICIOAPP})")
+        return
+    
+    # Contadores
+    entradas_encontradas = 0
+    salidas_encontradas = 0
+    procesados = 0
+    
+    try:
+        # Obtener mensajes históricos
+        async for message in canal_servicio.history(limit=cantidad):
+            # Solo procesar mensajes del bot Servicio
+            if message.author.name != 'Servicio':
+                continue
+            
+            procesados += 1
+            
+            # Patrones para detectar entrada/salida
+            patron_entrada = r'\[PDA(\d+)\]\s+([^h]+)\s+ha entrado en servicio'
+            patron_salida = r'\[PDA(\d+)\]\s+([^h]+)\s+ha salido de servicio'
+            
+            match_entrada = re.search(patron_entrada, message.content)
+            match_salida = re.search(patron_salida, message.content)
+            
+            if match_entrada:
+                dni = match_entrada.group(1)
+                nombre = match_entrada.group(2).strip()
+                
+                # Usar la fecha del mensaje histórico
+                entrada_time = message.created_at
+                
+                # Registrar en el sistema con la fecha correcta
+                fecha_str = entrada_time.strftime('%Y-%m-%d')
+                
+                # Solo registrar si es de esta semana
+                if entrada_time >= datetime.now() - timedelta(days=7):
+                    # Verificar si ya no está registrado para evitar duplicados
+                    if dni not in [d for d in tracker.daily_records[fecha_str].keys()]:
+                        tracker.active_shifts[dni] = {
+                            'nombre': nombre,
+                            'entrada': entrada_time
+                        }
+                        entradas_encontradas += 1
+                        print(f"📥 Entrada histórica: {nombre} (PDA{dni}) - {entrada_time}")
+            
+            elif match_salida:
+                dni = match_salida.group(1)
+                nombre = match_salida.group(2).strip()
+                
+                if dni in tracker.active_shifts:
+                    entrada = tracker.active_shifts[dni]['entrada']
+                    salida = message.created_at
+                    horas = (salida - entrada).total_seconds() / 3600
+                    
+                    fecha_str = entrada.strftime('%Y-%m-%d')
+                    
+                    tracker.daily_records[fecha_str][dni].append({
+                        'entrada': entrada,
+                        'salida': salida,
+                        'horas': horas,
+                        'nombre': nombre
+                    })
+                    
+                    tracker.weekly_stats[dni]['nombre'] = nombre
+                    tracker.weekly_stats[dni]['total_horas'] += horas
+                    tracker.weekly_stats[dni]['total_entradas'] += 1
+                    tracker.weekly_stats[dni]['daily_hours'][fecha_str] += horas
+                    tracker.weekly_stats[dni]['daily_entries'][fecha_str] += 1
+                    
+                    del tracker.active_shifts[dni]
+                    salidas_encontradas += 1
+                    print(f"📤 Salida histórica: {nombre} (PDA{dni}) - {horas:.2f}h")
+        
+        # Guardar datos
+        tracker.save_data()
+        
+        # Reporte
+        embed = discord.Embed(
+            title="✅ Escaneo Completado",
+            color=discord.Color.green()
+        )
+        embed.add_field(name="Mensajes revisados", value=str(procesados), inline=True)
+        embed.add_field(name="Entradas encontradas", value=str(entradas_encontradas), inline=True)
+        embed.add_field(name="Salidas encontradas", value=str(salidas_encontradas), inline=True)
+        embed.add_field(
+            name="ℹ️ Nota", 
+            value="Solo se registraron eventos de los últimos 7 días para mantener coherencia con las estadísticas semanales.",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+        
+    except discord.Forbidden:
+        await ctx.send("❌ No tengo permisos para leer el historial del canal de Servicio")
+    except Exception as e:
+        await ctx.send(f"❌ Error al escanear: {str(e)}")
+        print(f"Error en escanear_historial: {e}")
 
 @bot.command(name='reset_semana')
 @commands.has_permissions(administrator=True)
