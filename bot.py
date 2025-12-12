@@ -7,14 +7,14 @@ import os
 from collections import defaultdict
 
 # ============ CONFIGURACIÓN ============
-# Token del bot
+# Token del bot - desde variables de entorno
 TOKEN = os.getenv('DISCORD_TOKEN')
 if not TOKEN:
     raise ValueError("❌ ERROR CRÍTICO: No se encontró DISCORD_TOKEN en las variables de entorno")
 
-# IDs de los canales - con valores por defecto
-CANAL_SERVICIOAPP_STR = os.getenv('CANAL_SERVICIOAPP_ID', '1448835558410289183')
-CANAL_COMANDOS_STR = os.getenv('CANAL_COMANDOS_ID', '1448858691670376468')
+# IDs de los canales - desde variables de entorno o valores por defecto
+CANAL_SERVICIOAPP_STR = os.getenv('CANAL_SERVICIOAPP', '1448835558410289183')
+CANAL_COMANDOS_STR = os.getenv('CANAL_COMANDOS', '1448858691670376468')
 
 try:
     CANAL_SERVICIOAPP = int(CANAL_SERVICIOAPP_STR)
@@ -30,6 +30,19 @@ intents.message_content = True
 intents.messages = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
+
+# ============ DEPURACIÓN ============
+print("🔍 DEPURANDO VARIABLES DE ENTORNO:")
+print(f"   - DISCORD_TOKEN: {'✅ SET' if os.getenv('DISCORD_TOKEN') else '❌ NO SET'}")
+print(f"   - CANAL_SERVICIOAPP: {os.getenv('CANAL_SERVICIOAPP', '❌ NO SET')}")
+print(f"   - CANAL_COMANDOS: {os.getenv('CANAL_COMANDOS', '❌ NO SET')}")
+print(f"   - RAILPACK_PYTHON_VERSION: {os.getenv('RAILPACK_PYTHON_VERSION', '❌ NO SET')}")
+
+# Listar todas las variables disponibles
+print("\n📋 TODAS LAS VARIABLES DISPONIBLES:")
+for key, value in os.environ.items():
+    if 'TOKEN' in key or 'CANAL' in key or 'RAIL' in key:
+        print(f"   - {key}: {'***' if 'TOKEN' in key else value}")
 
 # Almacenamiento de datos
 class ShiftTracker:
