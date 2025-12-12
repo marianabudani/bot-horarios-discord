@@ -7,16 +7,23 @@ import os
 from collections import defaultdict
 
 # ============ CONFIGURACIÓN ============
-# IDs de los canales
-CANAL_SERVICIOAPP_ID = os.getenv('CANAL_SERVICIOAPP_ID')
-CANAL_COMANDOS_ID = os.getenv('CANAL_COMANDOS_ID')
+# Token del bot
+TOKEN = os.getenv('DISCORD_TOKEN')
+if not TOKEN:
+    raise ValueError("❌ ERROR CRÍTICO: No se encontró DISCORD_TOKEN en las variables de entorno")
 
-# Convertir a enteros y validar
-if not CANAL_SERVICIOAPP_ID or not CANAL_COMANDOS_ID:
-    raise ValueError("⚠️ Faltan las variables CANAL_SERVICIOAPP_ID o CANAL_COMANDOS_ID")
+# IDs de los canales - con valores por defecto
+CANAL_SERVICIOAPP_STR = os.getenv('CANAL_SERVICIOAPP_ID', '1448835558410289183')
+CANAL_COMANDOS_STR = os.getenv('CANAL_COMANDOS_ID', '1448858691670376468')
 
-CANAL_SERVICIOAPP = int(CANAL_SERVICIOAPP_ID)
-CANAL_COMANDOS = int(CANAL_COMANDOS_ID)
+try:
+    CANAL_SERVICIOAPP = int(CANAL_SERVICIOAPP_STR)
+    CANAL_COMANDOS = int(CANAL_COMANDOS_STR)
+    print(f"✅ Configuración cargada:")
+    print(f"   - Canal ServicioAPP ID: {CANAL_SERVICIOAPP}")
+    print(f"   - Canal Comandos ID: {CANAL_COMANDOS}")
+except (ValueError, TypeError) as e:
+    raise ValueError(f"❌ Error al convertir IDs de canales a números: {e}")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -147,7 +154,10 @@ tracker = ShiftTracker()
 
 @bot.event
 async def on_ready():
-    print(f'{bot.user} está conectado!')
+    print(f'✅ {bot.user} está conectado!')
+    print(f'   - ID del bot: {bot.user.id}')
+    print(f'   - Servidores conectados: {len(bot.guilds)}')
+    
     tracker.load_data()
     weekly_reset.start()
     
@@ -156,24 +166,30 @@ async def on_ready():
     canal_comandos = bot.get_channel(CANAL_COMANDOS)
     
     if canal_servicio:
-        print(f'✅ Canal ServicioAPP encontrado: {canal_servicio.name}')
+        print(f'✅ Canal ServicioAPP encontrado: {canal_servicio.name} (ID: {canal_servicio.id})')
     else:
-        print(f'❌ No se pudo encontrar el canal ServicioAPP (ID: {CANAL_SERVICIOAPP})')
+        print(f'⚠️ No se pudo encontrar el canal ServicioAPP (ID: {CANAL_SERVICIOAPP})')
+        print(f'   Verifica que el bot tenga acceso al canal y que el ID sea correcto')
     
     if canal_comandos:
-        print(f'✅ Canal de comandos encontrado: {canal_comandos.name}')
+        print(f'✅ Canal de comandos encontrado: {canal_comandos.name} (ID: {canal_comandos.id})')
     else:
-        print(f'❌ No se pudo encontrar el canal de comandos (ID: {CANAL_COMANDOS})')
+        print(f'⚠️ No se pudo encontrar el canal de comandos (ID: {CANAL_COMANDOS})')
+        print(f'   Verifica que el bot tenga acceso al canal y que el ID sea correcto')
     
     # Enviar mensaje de inicio al canal de comandos
     if canal_comandos:
-        embed = discord.Embed(
-            title="🤖 Bot de Control de Horarios Iniciado",
-            description="El bot está listo para registrar entradas y salidas.",
-            color=discord.Color.green()
-        )
-        embed.add_field(name="Comandos Disponibles", value="`!hoy` `!semana` `!activos`", inline=False)
-        await canal_comandos.send(embed=embed)
+        try:
+            embed = discord.Embed(
+                title="🤖 Bot de Control de Horarios Iniciado",
+                description="El bot está listo para registrar entradas y salidas.",
+                color=discord.Color.green()
+            )
+            embed.add_field(name="Comandos Disponibles", value="`!hoy` `!semana` `!activos`", inline=False)
+            await canal_comandos.send(embed=embed)
+            print(f'✅ Mensaje de inicio enviado al canal de comandos')
+        except Exception as e:
+            print(f'⚠️ No se pudo enviar mensaje al canal de comandos: {e}')
 
 @bot.event
 async def on_message(message):
@@ -421,6 +437,20 @@ async def weekly_reset():
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 if not TOKEN:
-    raise ValueError("⚠️ No se encontró DISCORD_TOKEN en las variables de entorno")
+    raise ValueError("❌ ERROR CRÍTICO: No se encontró DISCORD_TOKEN en las variables de entorno")
 
-bot.run(TOKEN)
+print("🚀 Iniciando bot...")
+print(f"   Token configurado: {'✅ Sí' if TOKEN else '❌ No'}")
+print(f"   Longitud del token: {len(TOKEN) if TOKEN else 0} caracteres")
+
+try:
+    bot.run(TOKEN)
+except discord.LoginFailure:
+    print("❌ ERROR DE LOGIN:")
+    print("   1. Verifica que el token sea correcto")
+    print("   2. Regenera el token en Discord Developer Portal")
+    print("   3. Actualiza la variable DISCORD_TOKEN en Railway")
+    raise
+except Exception as e:
+    print(f"❌ ERROR INESPERADO: {e}")
+    raise
