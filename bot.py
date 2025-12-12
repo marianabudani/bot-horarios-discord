@@ -7,8 +7,8 @@ from collections import defaultdict
 
 # ============ CONFIGURACIÓN ============
 # IDs de los canales
-CANAL_SERVICIOAPP = 1448835558410289183  # Canal donde ServicioAPP publica
-CANAL_COMANDOS = 1448858691670376468      # Canal donde el bot responde
+CANAL_SERVICIOAPP = os.getenv('CANAL_SERVICIOAPP_ID')  # Reemplaza con el ID del canal de ServicioAPP
+CANAL_COMANDOS = os.getenv('CANAL_COMANDOS_ID')  # Reemplaza con el ID del canal de comandos
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -410,5 +410,9 @@ async def weekly_reset():
     tracker.save_data()
 
 # Token del bot
-TOKEN = 'MTQ0ODg2MjUxMTQ3NzU1OTM0Nw.G7FlTH.I2hKYIwp7JYHReSZoqBT7z-AheHV2MrDzrGGSY'
+TOKEN = os.getenv('DISCORD_TOKEN')
+
+if not TOKEN:
+    raise ValueError("⚠️ No se encontró DISCORD_TOKEN en las variables de entorno")
+
 bot.run(TOKEN)
