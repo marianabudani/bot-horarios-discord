@@ -7,14 +7,14 @@ import os
 from collections import defaultdict
 
 # ============ CONFIGURACIÓN ============
-# Token del bot
+# Token del bot - SOLO desde variable de entorno
 TOKEN = os.getenv('DISCORD_TOKEN')
 if not TOKEN:
     raise ValueError("❌ ERROR CRÍTICO: No se encontró DISCORD_TOKEN en las variables de entorno")
 
-# IDs de los canales - con valores por defecto
-CANAL_SERVICIOAPP_STR = os.getenv('CANAL_SERVICIOAPP_ID', '1448835558410289183')
-CANAL_COMANDOS_STR = os.getenv('CANAL_COMANDOS_ID', '1448858691670376468')
+# IDs de los canales - desde variables de entorno o valores por defecto
+CANAL_SERVICIOAPP_STR = os.getenv('CANAL_SERVICIOAPP', '1448835558410289183')
+CANAL_COMANDOS_STR = os.getenv('CANAL_COMANDOS', '1448858691670376468')
 
 try:
     CANAL_SERVICIOAPP = int(CANAL_SERVICIOAPP_STR)
@@ -433,12 +433,6 @@ async def weekly_reset():
     tracker.weekly_stats.clear()
     tracker.save_data()
 
-# Token del bot desde variable de entorno
-TOKEN = os.getenv('DISCORD_TOKEN')
-
-if not TOKEN:
-    raise ValueError("❌ ERROR CRÍTICO: No se encontró DISCORD_TOKEN en las variables de entorno")
-
 print("🚀 Iniciando bot...")
 print(f"   Token configurado: {'✅ Sí' if TOKEN else '❌ No'}")
 print(f"   Longitud del token: {len(TOKEN) if TOKEN else 0} caracteres")
@@ -449,7 +443,7 @@ except discord.LoginFailure:
     print("❌ ERROR DE LOGIN:")
     print("   1. Verifica que el token sea correcto")
     print("   2. Regenera el token en Discord Developer Portal")
-    print("   3. Actualiza la variable DISCORD_TOKEN en Railway")
+    print("   3. Actualiza la variable DISCORD_TOKEN")
     raise
 except Exception as e:
     print(f"❌ ERROR INESPERADO: {e}")
