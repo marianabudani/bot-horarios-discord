@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands, tasks
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import re
 import os
@@ -107,7 +107,7 @@ class ShiftTracker:
     
     def registrar_entrada(self, dni, nombre):
         """Registra la entrada de un empleado"""
-        ahora = datetime.now()
+        ahora = datetime.now(timezone.utc)
         self.active_shifts[dni] = {
             'nombre': nombre,
             'entrada': ahora
@@ -121,7 +121,7 @@ class ShiftTracker:
             return None
         
         entrada = self.active_shifts[dni]['entrada']
-        salida = datetime.now()
+        salida = datetime.now(timezone.utc)
         horas_trabajadas = (salida - entrada).total_seconds() / 3600
         
         # Guardar en registros diarios
@@ -272,7 +272,8 @@ async def on_message(message):
 @bot.command(name='hoy')
 async def reporte_diario(ctx, dni=None):
     """Muestra el reporte de horas del día actual"""
-    fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+    # Usar timezone UTC para consistencia
+    fecha_hoy = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     
     if dni:
         # Reporte individual
@@ -305,7 +306,7 @@ async def reporte_diario(ctx, dni=None):
         # Verificar si está en turno activo
         if dni in tracker.active_shifts:
             entrada_activa = tracker.active_shifts[dni]['entrada']
-            tiempo_actual = (datetime.now() - entrada_activa).total_seconds() / 3600
+            tiempo_actual = (datetime.now(timezone.utc) - entrada_activa).total_seconds() / 3600
             embed.add_field(
                 name="🟢 Turno Actual (En curso)",
                 value=f"🕐 {entrada_activa.strftime('%H:%M:%S')} → Ahora\n⏱️ {tiempo_actual:.2f}h",
@@ -345,7 +346,7 @@ async def reporte_diario(ctx, dni=None):
         if tracker.active_shifts:
             embed.add_field(name="━━━━━━━━━━━━━━━", value="**🟢 Actualmente en Servicio:**", inline=False)
             for dni, info in tracker.active_shifts.items():
-                tiempo = (datetime.now() - info['entrada']).total_seconds() / 3600
+                tiempo = (datetime.now(timezone.utc) - info['entrada']).total_seconds() / 3600
                 embed.add_field(
                     name=f"{info['nombre']} (PDA{dni})",
                     value=f"⏱️ {tiempo:.2f}h (en curso)",
@@ -426,7 +427,7 @@ async def empleados_activos(ctx):
     )
     
     for dni, info in tracker.active_shifts.items():
-        tiempo = datetime.now() - info['entrada']
+        tiempo = datetime.now(timezone.utc) - info['entrada']
         horas = tiempo.total_seconds() / 3600
         embed.add_field(
             name=f"{info['nombre']} (PDA{dni})",
@@ -479,14 +480,15 @@ async def escanear_historial(ctx, cantidad: int = 100):
                 dni = match_entrada.group(1)
                 nombre = match_entrada.group(2).strip()
                 
-                # Usar la fecha del mensaje histórico
+                # Usar la fecha del mensaje histórico (ya viene con timezone UTC)
                 entrada_time = message.created_at
                 
                 # Registrar en el sistema con la fecha correcta
                 fecha_str = entrada_time.strftime('%Y-%m-%d')
                 
-                # Solo registrar si es de esta semana
-                if entrada_time >= datetime.now() - timedelta(days=7):
+                # Solo registrar si es de esta semana (comparar con datetime timezone-aware)
+                ahora_utc = datetime.now(timezone.utc)
+                if entrada_time >= ahora_utc - timedelta(days=7):
                     # Verificar si ya no está registrado para evitar duplicados
                     if dni not in [d for d in tracker.daily_records[fecha_str].keys()]:
                         tracker.active_shifts[dni] = {
