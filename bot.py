@@ -217,8 +217,10 @@ async def on_message(message):
         print(f"   Contenido completo: '{message.content}'")
         
         # Patrón para extraer DNI y nombre
-        patron_entrada = r'\[PDA(\d+)\]\s+([^h]+)\s+ha entrado en servicio'
-        patron_salida = r'\[PDA(\d+)\]\s+([^h]+)\s+ha salido de servicio'
+        # DNI: cualquier cosa dentro de []
+        # Nombre: captura todo hasta "ha entrado/salido", incluyendo formato **Nombre**
+        patron_entrada = r'\[([^\]]+)\]\s+(.+?)\s+ha entrado en servicio'
+        patron_salida = r'\[([^\]]+)\]\s+(.+?)\s+ha salido de servicio'
         
         match_entrada = re.search(patron_entrada, message.content)
         match_salida = re.search(patron_salida, message.content)
@@ -229,8 +231,14 @@ async def on_message(message):
             return
         
         if match_entrada:
-            dni = match_entrada.group(1)
+            dni = match_entrada.group(1).strip()
             nombre = match_entrada.group(2).strip()
+            # Limpiar formato de Discord (**texto**, __texto__, etc.)
+            nombre = re.sub(r'\*\*(.+?)\*\*', r'\1', nombre)  # **texto** -> texto
+            nombre = re.sub(r'__(.+?)__', r'\1', nombre)      # __texto__ -> texto
+            nombre = re.sub(r'\*(.+?)\*', r'\1', nombre)      # *texto* -> texto
+            nombre = nombre.strip()
+            
             print(f"✅ ENTRADA detectada: DNI={dni}, Nombre={nombre}")
             entrada = tracker.registrar_entrada(dni, nombre)
             
@@ -239,15 +247,21 @@ async def on_message(message):
                 color=discord.Color.green(),
                 timestamp=entrada
             )
-            embed.add_field(name="DNI", value=f"PDA{dni}", inline=True)
+            embed.add_field(name="DNI", value=dni, inline=True)
             embed.add_field(name="Nombre", value=nombre, inline=True)
             embed.add_field(name="Hora", value=entrada.strftime('%H:%M:%S'), inline=True)
             
             await canal_comandos.send(embed=embed)
         
         elif match_salida:
-            dni = match_salida.group(1)
+            dni = match_salida.group(1).strip()
             nombre = match_salida.group(2).strip()
+            # Limpiar formato de Discord
+            nombre = re.sub(r'\*\*(.+?)\*\*', r'\1', nombre)
+            nombre = re.sub(r'__(.+?)__', r'\1', nombre)
+            nombre = re.sub(r'\*(.+?)\*', r'\1', nombre)
+            nombre = nombre.strip()
+            
             print(f"✅ SALIDA detectada: DNI={dni}, Nombre={nombre}")
             turno = tracker.registrar_salida(dni, nombre)
             
@@ -257,7 +271,7 @@ async def on_message(message):
                     color=discord.Color.red(),
                     timestamp=turno['salida']
                 )
-                embed.add_field(name="DNI", value=f"PDA{dni}", inline=True)
+                embed.add_field(name="DNI", value=dni, inline=True)
                 embed.add_field(name="Nombre", value=nombre, inline=True)
                 embed.add_field(name="Entrada", value=turno['entrada'].strftime('%H:%M:%S'), inline=True)
                 embed.add_field(name="Salida", value=turno['salida'].strftime('%H:%M:%S'), inline=True)
@@ -276,12 +290,12 @@ async def reporte_diario(ctx, dni=None):
     fecha_hoy = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     
     if dni:
-        # Reporte individual
-        dni = dni.replace('PDA', '')
+        # Reporte individual - El DNI puede venir con o sin prefijo
+        # Ej: LCR35534, PDA10646, o solo 35534
         records = tracker.daily_records[fecha_hoy].get(dni, [])
         
         if not records and dni not in tracker.active_shifts:
-            await ctx.send(f"No hay registros para el DNI PDA{dni} hoy.")
+            await ctx.send(f"No hay registros para el DNI {dni} hoy.")
             return
         
         nombre = records[0]['nombre'] if records else tracker.active_shifts[dni]['nombre']
@@ -290,7 +304,7 @@ async def reporte_diario(ctx, dni=None):
         
         embed = discord.Embed(
             title=f"📊 Reporte Diario - {nombre}",
-            description=f"DNI: PDA{dni}\nFecha: {fecha_hoy}",
+            description=f"DNI: {dni}\nFecha: {fecha_hoy}",
             color=discord.Color.blue()
         )
         
@@ -316,7 +330,7 @@ async def reporte_diario(ctx, dni=None):
         embed.add_field(name="Total de Horas", value=f"{total_horas:.2f}h", inline=True)
         embed.add_field(name="Veces Entró", value=str(entradas), inline=True)
         
-        await ctx.send(embed=embed)
+        await ctx.send(embed=embed) ctx.send(embed=embed)
     else:
         # Reporte general
         embed = discord.Embed(
@@ -337,7 +351,7 @@ async def reporte_diario(ctx, dni=None):
                 total_horas = sum(t['horas'] for t in turnos)
                 entradas = len(turnos)
                 embed.add_field(
-                    name=f"{nombre} (PDA{dni})",
+                    name=f"{nombre} [{dni}]",
                     value=f"⏱️ {total_horas:.2f}h | 🔄 {entradas} entradas",
                     inline=False
                 )
@@ -348,7 +362,7 @@ async def reporte_diario(ctx, dni=None):
             for dni, info in tracker.active_shifts.items():
                 tiempo = (datetime.now(timezone.utc) - info['entrada']).total_seconds() / 3600
                 embed.add_field(
-                    name=f"{info['nombre']} (PDA{dni})",
+                    name=f"{info['nombre']} [{dni}]",
                     value=f"⏱️ {tiempo:.2f}h (en curso)",
                     inline=False
                 )
@@ -407,7 +421,7 @@ async def reporte_semanal(ctx, dni=None):
         for dni, stats in sorted_stats:
             if stats['total_horas'] > 0:
                 embed.add_field(
-                    name=f"{stats['nombre']} (PDA{dni})",
+                    name=f"{stats['nombre']} [{dni}]",
                     value=f"⏱️ {stats['total_horas']:.2f}h | 🔄 {stats['total_entradas']} entradas",
                     inline=False
                 )
@@ -430,7 +444,7 @@ async def empleados_activos(ctx):
         tiempo = datetime.now(timezone.utc) - info['entrada']
         horas = tiempo.total_seconds() / 3600
         embed.add_field(
-            name=f"{info['nombre']} (PDA{dni})",
+            name=f"{info['nombre']} [{dni}]",
             value=f"🕐 Entrada: {info['entrada'].strftime('%H:%M:%S')}\n⏱️ Tiempo: {horas:.2f}h",
             inline=False
         )
@@ -469,16 +483,21 @@ async def escanear_historial(ctx, cantidad: int = 100):
             
             procesados += 1
             
-            # Patrones para detectar entrada/salida
-            patron_entrada = r'\[PDA(\d+)\]\s+([^h]+)\s+ha entrado en servicio'
-            patron_salida = r'\[PDA(\d+)\]\s+([^h]+)\s+ha salido de servicio'
+            # Patrones para detectar entrada/salida - Flexibles para cualquier DNI
+            patron_entrada = r'\[([^\]]+)\]\s+(.+?)\s+ha entrado en servicio'
+            patron_salida = r'\[([^\]]+)\]\s+(.+?)\s+ha salido de servicio'
             
             match_entrada = re.search(patron_entrada, message.content)
             match_salida = re.search(patron_salida, message.content)
             
             if match_entrada:
-                dni = match_entrada.group(1)
+                dni = match_entrada.group(1).strip()
                 nombre = match_entrada.group(2).strip()
+                # Limpiar formato de Discord
+                nombre = re.sub(r'\*\*(.+?)\*\*', r'\1', nombre)
+                nombre = re.sub(r'__(.+?)__', r'\1', nombre)
+                nombre = re.sub(r'\*(.+?)\*', r'\1', nombre)
+                nombre = nombre.strip()
                 
                 # Usar la fecha del mensaje histórico (ya viene con timezone UTC)
                 entrada_time = message.created_at
@@ -496,11 +515,16 @@ async def escanear_historial(ctx, cantidad: int = 100):
                             'entrada': entrada_time
                         }
                         entradas_encontradas += 1
-                        print(f"📥 Entrada histórica: {nombre} (PDA{dni}) - {entrada_time}")
+                        print(f"📥 Entrada histórica: {nombre} ({dni}) - {entrada_time}")
             
             elif match_salida:
-                dni = match_salida.group(1)
+                dni = match_salida.group(1).strip()
                 nombre = match_salida.group(2).strip()
+                # Limpiar formato de Discord
+                nombre = re.sub(r'\*\*(.+?)\*\*', r'\1', nombre)
+                nombre = re.sub(r'__(.+?)__', r'\1', nombre)
+                nombre = re.sub(r'\*(.+?)\*', r'\1', nombre)
+                nombre = nombre.strip()
                 
                 if dni in tracker.active_shifts:
                     entrada = tracker.active_shifts[dni]['entrada']
@@ -524,7 +548,7 @@ async def escanear_historial(ctx, cantidad: int = 100):
                     
                     del tracker.active_shifts[dni]
                     salidas_encontradas += 1
-                    print(f"📤 Salida histórica: {nombre} (PDA{dni}) - {horas:.2f}h")
+                    print(f"📤 Salida histórica: {nombre} ({dni}) - {horas:.2f}h")
         
         # Guardar datos
         tracker.save_data()
