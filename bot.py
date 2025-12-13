@@ -185,7 +185,7 @@ async def on_ready():
                 description="El bot está listo para registrar entradas y salidas.",
                 color=discord.Color.green()
             )
-            embed.add_field(name="Comandos Disponibles", value="`!hoy` `!semana` `!activos` `!escanear`", inline=False)
+            embed.add_field(name="Comandos Disponibles", value="`!hoy` `!semana` `!activos` `!escanear` `!limpiar_datos`", inline=False)
             await canal_comandos.send(embed=embed)
             print(f'✅ Mensaje de inicio enviado al canal de comandos')
         except Exception as e:
@@ -463,13 +463,22 @@ async def escanear_historial(ctx, cantidad: int = 100):
     entradas_encontradas = 0
     salidas_encontradas = 0
     procesados = 0
+    mensajes_temp = []
     
     try:
-        # Obtener mensajes históricos
+        # Obtener mensajes históricos y guardarlos en una lista
+        await ctx.send("📥 Descargando mensajes...")
         async for message in canal_servicio.history(limit=cantidad):
-            # Solo procesar mensajes del bot Servicio
-            if message.author.name != 'Servicio':
-                continue
+            if message.author.name == 'Servicio':
+                mensajes_temp.append(message)
+        
+        # Invertir para procesar del más antiguo al más reciente
+        mensajes_temp.reverse()
+        
+        await ctx.send(f"🔄 Procesando {len(mensajes_temp)} mensajes en orden cronológico...")
+        
+        # Procesar mensajes en orden cronológico (del más antiguo al más reciente)
+        for message in mensajes_temp:
             
             procesados += 1
             
@@ -563,6 +572,22 @@ async def reset_semanal(ctx):
     tracker.weekly_stats.clear()
     tracker.save_data()
     await ctx.send("✅ Estadísticas semanales reseteadas.")
+
+@bot.command(name='limpiar_datos')
+@commands.has_permissions(administrator=True)
+async def limpiar_datos(ctx):
+    """Limpia TODOS los datos (solo administradores) - Útil antes de reescanear"""
+    tracker.active_shifts.clear()
+    tracker.daily_records.clear()
+    tracker.weekly_stats.clear()
+    tracker.save_data()
+    
+    embed = discord.Embed(
+        title="🗑️ Datos Limpiados",
+        description="Todos los registros han sido eliminados. Usa `!escanear` para cargar el historial de nuevo.",
+        color=discord.Color.orange()
+    )
+    await ctx.send(embed=embed)
 
 @tasks.loop(hours=168)  # 7 días
 async def weekly_reset():
