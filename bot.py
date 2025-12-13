@@ -213,31 +213,26 @@ async def on_message(message):
             print(f"⚠️ No se pudo encontrar el canal de comandos")
             return
         
-        print(f"🔍 Procesando mensaje de ServicioAPP:")
+        print(f"🔍 Procesando mensaje de Servicio:")
         print(f"   Contenido completo: '{message.content}'")
         
         # Patrón para extraer DNI y nombre
-        # DNI: cualquier cosa dentro de []
-        # Nombre: captura todo hasta "ha entrado/salido", incluyendo formato **Nombre**
-        patron_entrada = r'\[([^\]]+)\]\s+(.+?)\s+ha entrado en servicio'
-        patron_salida = r'\[([^\]]+)\]\s+(.+?)\s+ha salido de servicio'
+        # Formato: **[ABC12345] Nombre Apellido** ha entrado/salido en servicio
+        # El ** puede o no estar presente
+        patron_entrada = r'\*?\*?\[([A-Z]{3}\d{5})\]\s+([^\*]+?)\*?\*?\s+ha entrado en servicio'
+        patron_salida = r'\*?\*?\[([A-Z]{3}\d{5})\]\s+([^\*]+?)\*?\*?\s+ha salido de servicio'
         
-        match_entrada = re.search(patron_entrada, message.content)
-        match_salida = re.search(patron_salida, message.content)
+        match_entrada = re.search(patron_entrada, message.content, re.IGNORECASE)
+        match_salida = re.search(patron_salida, message.content, re.IGNORECASE)
         
         if not match_entrada and not match_salida:
             print(f"❌ No se encontró patrón de entrada/salida en el mensaje")
-            print(f"   ¿Es un mensaje de entrada/salida de servicio?")
+            print(f"   Patrón esperado: **[XXX12345] Nombre** ha entrado/salido en servicio")
             return
         
         if match_entrada:
-            dni = match_entrada.group(1).strip()
+            dni = match_entrada.group(1).upper()  # Normalizar a mayúsculas
             nombre = match_entrada.group(2).strip()
-            # Limpiar formato de Discord (**texto**, __texto__, etc.)
-            nombre = re.sub(r'\*\*(.+?)\*\*', r'\1', nombre)  # **texto** -> texto
-            nombre = re.sub(r'__(.+?)__', r'\1', nombre)      # __texto__ -> texto
-            nombre = re.sub(r'\*(.+?)\*', r'\1', nombre)      # *texto* -> texto
-            nombre = nombre.strip()
             
             print(f"✅ ENTRADA detectada: DNI={dni}, Nombre={nombre}")
             entrada = tracker.registrar_entrada(dni, nombre)
@@ -254,13 +249,8 @@ async def on_message(message):
             await canal_comandos.send(embed=embed)
         
         elif match_salida:
-            dni = match_salida.group(1).strip()
+            dni = match_salida.group(1).upper()  # Normalizar a mayúsculas
             nombre = match_salida.group(2).strip()
-            # Limpiar formato de Discord
-            nombre = re.sub(r'\*\*(.+?)\*\*', r'\1', nombre)
-            nombre = re.sub(r'__(.+?)__', r'\1', nombre)
-            nombre = re.sub(r'\*(.+?)\*', r'\1', nombre)
-            nombre = nombre.strip()
             
             print(f"✅ SALIDA detectada: DNI={dni}, Nombre={nombre}")
             turno = tracker.registrar_salida(dni, nombre)
@@ -330,7 +320,7 @@ async def reporte_diario(ctx, dni=None):
         embed.add_field(name="Total de Horas", value=f"{total_horas:.2f}h", inline=True)
         embed.add_field(name="Veces Entró", value=str(entradas), inline=True)
         
-        await ctx.send(embed=embed) ctx.send(embed=embed)
+        await ctx.send(embed=embed)
     else:
         # Reporte general
         embed = discord.Embed(
@@ -373,16 +363,16 @@ async def reporte_diario(ctx, dni=None):
 async def reporte_semanal(ctx, dni=None):
     """Muestra el reporte de horas de la semana"""
     if dni:
-        dni = dni.replace('PDA', '')
+        # El DNI puede venir en cualquier formato
         stats = tracker.weekly_stats.get(dni)
         
         if not stats or stats['total_horas'] == 0:
-            await ctx.send(f"No hay registros para el DNI PDA{dni} esta semana.")
+            await ctx.send(f"No hay registros para el DNI {dni} esta semana.")
             return
         
         embed = discord.Embed(
             title=f"📈 Reporte Semanal - {stats['nombre']}",
-            description=f"DNI: PDA{dni}",
+            description=f"DNI: {dni}",
             color=discord.Color.purple()
         )
         
@@ -483,21 +473,17 @@ async def escanear_historial(ctx, cantidad: int = 100):
             
             procesados += 1
             
-            # Patrones para detectar entrada/salida - Flexibles para cualquier DNI
-            patron_entrada = r'\[([^\]]+)\]\s+(.+?)\s+ha entrado en servicio'
-            patron_salida = r'\[([^\]]+)\]\s+(.+?)\s+ha salido de servicio'
+            # Patrones para detectar entrada/salida
+            # Formato: **[ABC12345] Nombre Apellido** ha entrado/salido en servicio
+            patron_entrada = r'\*?\*?\[([A-Z]{3}\d{5})\]\s+([^\*]+?)\*?\*?\s+ha entrado en servicio'
+            patron_salida = r'\*?\*?\[([A-Z]{3}\d{5})\]\s+([^\*]+?)\*?\*?\s+ha salido de servicio'
             
-            match_entrada = re.search(patron_entrada, message.content)
-            match_salida = re.search(patron_salida, message.content)
+            match_entrada = re.search(patron_entrada, message.content, re.IGNORECASE)
+            match_salida = re.search(patron_salida, message.content, re.IGNORECASE)
             
             if match_entrada:
-                dni = match_entrada.group(1).strip()
+                dni = match_entrada.group(1).upper()
                 nombre = match_entrada.group(2).strip()
-                # Limpiar formato de Discord
-                nombre = re.sub(r'\*\*(.+?)\*\*', r'\1', nombre)
-                nombre = re.sub(r'__(.+?)__', r'\1', nombre)
-                nombre = re.sub(r'\*(.+?)\*', r'\1', nombre)
-                nombre = nombre.strip()
                 
                 # Usar la fecha del mensaje histórico (ya viene con timezone UTC)
                 entrada_time = message.created_at
@@ -518,13 +504,8 @@ async def escanear_historial(ctx, cantidad: int = 100):
                         print(f"📥 Entrada histórica: {nombre} ({dni}) - {entrada_time}")
             
             elif match_salida:
-                dni = match_salida.group(1).strip()
+                dni = match_salida.group(1).upper()
                 nombre = match_salida.group(2).strip()
-                # Limpiar formato de Discord
-                nombre = re.sub(r'\*\*(.+?)\*\*', r'\1', nombre)
-                nombre = re.sub(r'__(.+?)__', r'\1', nombre)
-                nombre = re.sub(r'\*(.+?)\*', r'\1', nombre)
-                nombre = nombre.strip()
                 
                 if dni in tracker.active_shifts:
                     entrada = tracker.active_shifts[dni]['entrada']
